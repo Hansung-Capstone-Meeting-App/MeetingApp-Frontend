@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Switch,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -50,10 +49,6 @@ function SectionCard({ title, children }) {
 
 export default function MyInfoScreen() {
   const { user, meetings, logout } = useAppContext();
-  const [notifMeeting, setNotifMeeting] = useState(true);
-  const [notifSummary, setNotifSummary] = useState(true);
-  const [aiAutoSummary, setAiAutoSummary] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
 
   const totalSessions = meetings.reduce((acc, m) => acc + m.sessions.length, 0);
   const completedSessions = meetings.reduce(
@@ -141,114 +136,6 @@ export default function MyInfoScreen() {
           />
         </SectionCard>
 
-        {/* 알림 설정 */}
-        <SectionCard title="알림">
-          <SettingRow
-            icon="notifications-outline"
-            iconBg="#FFF7ED"
-            iconColor="#F97316"
-            label="회의 알림"
-            hasArrow={false}
-            rightEl={<Switch value={notifMeeting} onValueChange={setNotifMeeting} trackColor={{ true: COLORS.primary }} thumbColor="#FFFFFF" />}
-          />
-          <View style={styles.rowDivider} />
-          <SettingRow
-            icon="document-text-outline"
-            iconBg="#F0FDF4"
-            iconColor={COLORS.success}
-            label="AI 요약 알림"
-            hasArrow={false}
-            rightEl={<Switch value={notifSummary} onValueChange={setNotifSummary} trackColor={{ true: COLORS.primary }} thumbColor="#FFFFFF" />}
-          />
-        </SectionCard>
-
-        {/* AI 설정 */}
-        <SectionCard title="AI 기능">
-          <SettingRow
-            icon="sparkles-outline"
-            iconBg="#FDF4FF"
-            iconColor={COLORS.secondary}
-            label="자동 요약"
-            value="회의 종료 시 자동 생성"
-            hasArrow={false}
-            rightEl={<Switch value={aiAutoSummary} onValueChange={setAiAutoSummary} trackColor={{ true: COLORS.primary }} thumbColor="#FFFFFF" />}
-          />
-          <View style={styles.rowDivider} />
-          <SettingRow
-            icon="language-outline"
-            iconBg="#FDF4FF"
-            iconColor={COLORS.secondary}
-            label="요약 언어"
-            value="한국어"
-            onPress={() => Alert.alert('언어 설정', '(추후 구현 예정)')}
-          />
-          <View style={styles.rowDivider} />
-          <SettingRow
-            icon="analytics-outline"
-            iconBg="#FDF4FF"
-            iconColor={COLORS.secondary}
-            label="AI 요약 기록 보기"
-            onPress={() => Alert.alert('AI 요약 기록', '(추후 구현 예정)')}
-          />
-        </SectionCard>
-
-        {/* 앱 설정 */}
-        <SectionCard title="앱 설정">
-          <SettingRow
-            icon="moon-outline"
-            iconBg="#F1F5F9"
-            iconColor={COLORS.subtext}
-            label="다크 모드"
-            hasArrow={false}
-            rightEl={<Switch value={darkMode} onValueChange={setDarkMode} trackColor={{ true: COLORS.primary }} thumbColor="#FFFFFF" />}
-          />
-          <View style={styles.rowDivider} />
-          <SettingRow
-            icon="globe-outline"
-            iconBg="#F1F5F9"
-            iconColor={COLORS.subtext}
-            label="언어"
-            value="한국어"
-            onPress={() => Alert.alert('언어', '(추후 구현 예정)')}
-          />
-          <View style={styles.rowDivider} />
-          <SettingRow
-            icon="information-circle-outline"
-            iconBg="#F1F5F9"
-            iconColor={COLORS.subtext}
-            label="버전"
-            value="1.0.0"
-            hasArrow={false}
-          />
-        </SectionCard>
-
-        {/* 지원 */}
-        <SectionCard title="지원">
-          <SettingRow
-            icon="help-circle-outline"
-            iconBg="#F0FDF4"
-            iconColor={COLORS.success}
-            label="도움말"
-            onPress={() => Alert.alert('도움말', '(추후 구현 예정)')}
-          />
-          <View style={styles.rowDivider} />
-          <SettingRow
-            icon="chatbubble-outline"
-            iconBg="#F0FDF4"
-            iconColor={COLORS.success}
-            label="문의하기"
-            onPress={() => Alert.alert('문의하기', '(추후 구현 예정)')}
-          />
-          <View style={styles.rowDivider} />
-          <SettingRow
-            icon="star-outline"
-            iconBg="#FFFBEB"
-            iconColor="#F59E0B"
-            label="앱 평가하기"
-            onPress={() => Alert.alert('앱 평가', '(추후 구현 예정)')}
-          />
-        </SectionCard>
-
         {/* 로그아웃 */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.85}>
           <Ionicons name="log-out-outline" size={18} color={COLORS.danger} />
@@ -266,14 +153,9 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 40 },
   // 프로필
   profileHeader: {
-    backgroundColor: COLORS.surface,
-    alignItems: 'center',
-    paddingTop: 28,
-    paddingBottom: 24,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    marginBottom: 16,
+    backgroundColor: COLORS.surface, alignItems: 'center',
+    paddingTop: 28, paddingBottom: 24, paddingHorizontal: 20,
+    borderBottomWidth: 1, borderBottomColor: COLORS.border, marginBottom: 16,
   },
   profileAvatarWrap: { position: 'relative', marginBottom: 12 },
   profileAvatar: {
@@ -314,15 +196,20 @@ const styles = StyleSheet.create({
   statDivider: { width: 1, height: '80%', backgroundColor: COLORS.border, alignSelf: 'center' },
   // 섹션
   sectionCard: {
-    marginHorizontal: 16, marginBottom: 14,
-    backgroundColor: COLORS.surface, borderRadius: 16,
+    marginHorizontal: 16, marginBottom: 14, backgroundColor: COLORS.surface, borderRadius: 16,
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
-    overflow: 'hidden',
+    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2, overflow: 'hidden',
   },
-  sectionTitle: { fontSize: 12, fontWeight: '700', color: COLORS.subtext, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionTitle: {
+    fontSize: 12, fontWeight: '700', color: COLORS.subtext,
+    paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4,
+    textTransform: 'uppercase', letterSpacing: 0.5,
+  },
   sectionContent: {},
-  settingRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
+  settingRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 16, paddingVertical: 12, gap: 12,
+  },
   settingIconWrap: { width: 34, height: 34, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   settingInfo: { flex: 1 },
   settingLabel: { fontSize: 15, color: COLORS.text, fontWeight: '500' },
