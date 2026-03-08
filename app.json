@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "MeetingApp",
+    "slug": "meetingapp-frontend",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.meetingapp.frontend",
+      "adaptiveIcon": {
+        "backgroundColor": "#4F46E5"
+      }
+    },
+    "web": {}
+  }
+}
