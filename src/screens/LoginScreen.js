@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../context/AppContext';
+import { loginApi, registerApi, getStoredDisplayName, setStoredDisplayName } from '../services/api';
 
 const COLORS = {
   primary: '#4F46E5',
@@ -30,8 +31,10 @@ const COLORS = {
 
 export default function LoginScreen() {
   const { login } = useAppContext();
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
@@ -42,19 +45,43 @@ export default function LoginScreen() {
       return;
     }
     setIsLoading(true);
-    // 실제 백엔드 연동 시 API 호출
-    setTimeout(() => {
+    try {
+      await loginApi(email, password);
+      // 이름: 회원가입 시 저장된 이름 → 없으면 이메일 @ 앞부분 사용
+      const name = getStoredDisplayName() || email.split('@')[0];
+      login({ email, name });
+    } catch (e) {
+      Alert.alert('로그인 실패', '이메일 또는 비밀번호를 확인해주세요.');
+    } finally {
       setIsLoading(false);
-      login({ id: '1', name: '김개발', email, role: '개발팀' });
-    }, 1000);
+    }
+  };
+
+  const handleRegister = async () => {
+    if (!email || !password || !displayName) {
+      Alert.alert('입력 오류', '이메일, 비밀번호, 이름을 모두 입력해주세요.');
+      return;
+    }
+    if (password.length < 8) {
+      Alert.alert('입력 오류', '비밀번호는 8자 이상이어야 합니다.');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await registerApi(email, password, displayName); // 내부에서 이름 자동 저장
+      setStoredDisplayName(displayName); // 로그인 화면 전환 후에도 유지
+      Alert.alert('회원가입 성공', '로그인해주세요.', [
+        { text: '확인', onPress: () => setIsRegisterMode(false) },
+      ]);
+    } catch (e) {
+      Alert.alert('회원가입 실패', '이미 사용 중인 이메일이거나 입력값을 확인해주세요.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleTempLogin = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      login(null); // context에서 기본값으로 로그인
-    }, 500);
+    Alert.alert('안내', '백엔드가 연결되었습니다. 실제 이메일과 비밀번호로 로그인해주세요.');
   };
 
   return (
@@ -82,9 +109,28 @@ export default function LoginScreen() {
             <Text style={styles.tagline}>AI가 회의를 요약해 드릴게요</Text>
           </View>
 
-          {/* 로그인 폼 */}
+          {/* 로그인/회원가입 폼 */}
           <View style={styles.formCard}>
-            <Text style={styles.formTitle}>로그인</Text>
+            <Text style={styles.formTitle}>{isRegisterMode ? '회원가입' : '로그인'}</Text>
+
+            {/* 이름 (회원가입 전용) */}
+            {isRegisterMode && (
+              <View style={styles.fieldWrapper}>
+                <Text style={styles.label}>이름</Text>
+                <View style={[styles.inputContainer, focusedField === 'name' && styles.inputFocused]}>
+                  <Ionicons name="person-outline" size={18} color={COLORS.subtext} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="이름 입력 (2자 이상)"
+                    placeholderTextColor="#A0AEC0"
+                    value={displayName}
+                    onChangeText={setDisplayName}
+                    onFocus={() => setFocusedField('name')}
+                    onBlur={() => setFocusedField(null)}
+                  />
+                </View>
+              </View>
+            )}
 
             {/* 이메일 */}
             <View style={styles.fieldWrapper}>
@@ -108,7 +154,7 @@ export default function LoginScreen() {
 
             {/* 비밀번호 */}
             <View style={styles.fieldWrapper}>
-              <Text style={styles.label}>비밀번호</Text>
+              <Text style={styles.label}>비밀번호{isRegisterMode && ' (8자 이상)'}</Text>
               <View style={[styles.inputContainer, focusedField === 'password' && styles.inputFocused]}>
                 <Ionicons name="lock-closed-outline" size={18} color={COLORS.subtext} style={styles.inputIcon} />
                 <TextInput
@@ -131,51 +177,28 @@ export default function LoginScreen() {
               </View>
             </View>
 
-            {/* 비밀번호 찾기 */}
-            <TouchableOpacity style={styles.forgotPasswordBtn}>
-              <Text style={styles.forgotPasswordText}>비밀번호를 잊으셨나요?</Text>
-            </TouchableOpacity>
-
-            {/* 로그인 버튼 */}
+            {/* 메인 버튼 */}
             <TouchableOpacity
               style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
-              onPress={handleLogin}
+              onPress={isRegisterMode ? handleRegister : handleLogin}
               activeOpacity={0.85}
               disabled={isLoading}
             >
               {isLoading ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
-                <Text style={styles.loginButtonText}>로그인</Text>
+                <Text style={styles.loginButtonText}>{isRegisterMode ? '회원가입' : '로그인'}</Text>
               )}
             </TouchableOpacity>
-
-            {/* 구분선 */}
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>또는</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            {/* 임시 로그인 버튼 */}
-            <TouchableOpacity
-              style={styles.tempLoginButton}
-              onPress={handleTempLogin}
-              activeOpacity={0.8}
-              disabled={isLoading}
-            >
-              <Ionicons name="flash-outline" size={16} color={COLORS.primary} style={{ marginRight: 6 }} />
-              <Text style={styles.tempLoginText}>임시 로그인 (UI 테스트용)</Text>
-            </TouchableOpacity>
-
-            <Text style={styles.tempLoginDesc}>백엔드 없이 UI를 바로 확인할 수 있어요</Text>
           </View>
 
-          {/* 회원가입 링크 */}
+          {/* 로그인/회원가입 전환 */}
           <View style={styles.signupRow}>
-            <Text style={styles.signupPrompt}>아직 계정이 없으신가요? </Text>
-            <TouchableOpacity>
-              <Text style={styles.signupLink}>회원가입</Text>
+            <Text style={styles.signupPrompt}>
+              {isRegisterMode ? '이미 계정이 있으신가요? ' : '아직 계정이 없으신가요? '}
+            </Text>
+            <TouchableOpacity onPress={() => { setIsRegisterMode(!isRegisterMode); setEmail(''); setPassword(''); setDisplayName(''); }}>
+              <Text style={styles.signupLink}>{isRegisterMode ? '로그인' : '회원가입'}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

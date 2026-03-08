@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
+import { createMeeting, fetchMeetings } from '../services/api';
 
 const AppContext = createContext(null);
 
@@ -6,19 +7,35 @@ export const AppProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [meetings, setMeetings] = useState([]); // 예시 데이터 없이 빈 상태로 시작
 
-  const login = (userData) => {
-    setUser(userData || { id: 'temp_user', name: '김개발', email: 'dev@meetingapp.io', role: '개발팀' });
+  const login = async (userData) => {
+    setUser(userData);
+    try {
+      const backendMeetings = await fetchMeetings();
+      // 백엔드 응답을 프론트 형식으로 변환
+      const mapped = backendMeetings.map((m) => ({
+        ...m,
+        name: m.title || '(제목 없음)',
+        participants: [],
+        sessions: [],
+      }));
+      setMeetings(mapped);
+    } catch (e) {
+      setMeetings([]); // 불러오기 실패해도 앱은 동작
+    }
   };
 
   const logout = () => {
     setUser(null);
+    setMeetings([]); // 로그아웃 시 회의 목록 초기화
   };
 
-  const addMeeting = (meetingData) => {
+  const addMeeting = async (meetingData) => {
+    const backendMeeting = await createMeeting(meetingData); // 백엔드에 회의 생성 → 실제 ID 획득
     const newMeeting = {
-      id: Date.now().toString(),
-      ...meetingData,
-      createdAt: new Date().toISOString(),
+      ...backendMeeting,
+      name: backendMeeting.title || meetingData.name,
+      participants: meetingData.participants || [],
+      description: meetingData.description || '',
       sessions: [],
     };
     setMeetings((prev) => [newMeeting, ...prev]);
@@ -38,7 +55,7 @@ export const AppProvider = ({ children }) => {
     };
     setMeetings((prev) =>
       prev.map((m) =>
-        m.id === meetingId ? { ...m, sessions: [newSession, ...m.sessions] } : m
+        String(m.id) === String(meetingId) ? { ...m, sessions: [newSession, ...m.sessions] } : m
       )
     );
     return newSession;
@@ -53,7 +70,7 @@ export const AppProvider = ({ children }) => {
   const updateMeetingSession = (meetingId, sessionId, updates) => {
     setMeetings((prev) =>
       prev.map((m) =>
-        m.id === meetingId
+        String(m.id) === String(meetingId)
           ? {
               ...m,
               sessions: m.sessions.map((s) =>
@@ -65,7 +82,8 @@ export const AppProvider = ({ children }) => {
     );
   };
 
-  const getMeetingById = (id) => meetings.find((m) => m.id === id);
+  // 백엔드 ID(숫자)와 로컬 ID(문자열) 모두 대응
+  const getMeetingById = (id) => meetings.find((m) => String(m.id) === String(id));
 
   return (
     <AppContext.Provider

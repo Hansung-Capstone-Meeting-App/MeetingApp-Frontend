@@ -60,7 +60,7 @@ export default function AddMeetingScreen({ navigation }) {
     setParticipants((prev) => prev.filter((p) => p !== name));
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!meetingName.trim()) {
       Alert.alert('입력 오류', '회의 이름을 입력해주세요.');
       return;
@@ -69,15 +69,19 @@ export default function AddMeetingScreen({ navigation }) {
       Alert.alert('입력 오류', '참여자를 한 명 이상 추가해주세요.');
       return;
     }
-    const meeting = addMeeting({
-      name: meetingName.trim(),
-      participants,
-      description: description.trim(),
-    });
-    navigation.replace('MeetingDetail', {
-      meetingId: meeting.id,
-      meetingName: meeting.name,
-    });
+    try {
+      const meeting = await addMeeting({
+        name: meetingName.trim(),
+        participants,
+        description: description.trim(),
+      });
+      navigation.replace('MeetingDetail', {
+        meetingId: meeting.id,
+        meetingName: meeting.name,
+      });
+    } catch (e) {
+      Alert.alert('오류', '회의 생성에 실패했습니다. 다시 시도해주세요.');
+    }
   };
 
   return (
