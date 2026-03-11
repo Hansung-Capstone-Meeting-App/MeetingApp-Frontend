@@ -5,11 +5,13 @@
  * BASE_URL 설정:
  *   const BASE_URL = 'https://your-backend.com/api';
  */
-
-const BASE_URL = 'http://172.30.1.46:8080/api';
+// ⚙️ IP가 바뀌면 여기 한 곳만 수정하세요!
+const BASE_HOST = 'http://10.31.230.252:8080';
+const BASE_URL = `${BASE_HOST}/api`;
 
 // 로그인 후 토큰 저장 (모듈 내부 상태)
 let authToken = null;
+
 // 회원가입/로그인 후 이름 저장
 let storedDisplayName = null;
 
@@ -25,7 +27,7 @@ export function setStoredDisplayName(name) { storedDisplayName = name; }
  * @returns {Promise<{id, name, email, role, token}>}
  */
 export async function loginApi(email, password) {
-  const res = await fetch(`http://172.30.1.46:8080/login`, {
+  const res = await fetch(`${BASE_HOST}/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
@@ -46,7 +48,7 @@ export async function loginApi(email, password) {
  * @returns {Promise<object>}
  */
 export async function registerApi(email, password, displayName) {
-  const res = await fetch(`http://172.30.1.46:8080/user`, {
+  const res = await fetch(`${BASE_HOST}/user`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password, displayName }),
@@ -102,6 +104,7 @@ export async function createMeeting(meetingData) {
 export async function uploadAndSummarize(meetingId, sessionId, audioUri, durationSeconds, fileName = null) {
   // Step 1: 녹음 파일 업로드
   const formData = new FormData();
+  // 모바일(React Native): { uri, type, name } 형식 사용
   formData.append('file', {
     uri: audioUri,
     type: fileName ? 'audio/*' : 'audio/m4a',

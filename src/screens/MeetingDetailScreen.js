@@ -111,18 +111,19 @@ function SummarizingModal({ visible }) {
 
 function SessionCard({ session, index, total }) {
   const isOngoing = session.status === 'ongoing';
+  const isFailed = session.status === 'failed';
   return (
     <View style={styles.sessionCard}>
       <View style={styles.timelineCol}>
-        <View style={[styles.timelineDot, isOngoing && styles.timelineDotActive]} />
+        <View style={[styles.timelineDot, isOngoing && styles.timelineDotActive, isFailed && styles.timelineDotFailed]} />
         {index < total - 1 && <View style={styles.timelineLine} />}
       </View>
       <View style={styles.sessionContent}>
         <View style={styles.sessionHeader}>
-          <View style={[styles.sessionStatusBadge, isOngoing ? styles.badgeOngoing : styles.badgeCompleted]}>
-            <View style={[styles.statusDot, isOngoing ? styles.statusDotActive : styles.statusDotCompleted]} />
-            <Text style={[styles.sessionStatusText, isOngoing ? styles.ongoingText : styles.completedText]}>
-              {isOngoing ? '진행 중' : '완료'}
+          <View style={[styles.sessionStatusBadge, isOngoing ? styles.badgeOngoing : isFailed ? styles.badgeFailed : styles.badgeCompleted]}>
+            <View style={[styles.statusDot, isOngoing ? styles.statusDotActive : isFailed ? styles.statusDotFailed : styles.statusDotCompleted]} />
+            <Text style={[styles.sessionStatusText, isOngoing ? styles.ongoingText : isFailed ? styles.failedText : styles.completedText]}>
+              {isOngoing ? '진행 중' : isFailed ? '실패' : '완료'}
             </Text>
           </View>
           <Text style={styles.sessionDate}>{formatDateTime(session.startedAt)}</Text>
@@ -298,6 +299,15 @@ export default function MeetingDetailScreen({ route, navigation }) {
               console.warn('녹음 중지 오류:', e);
             }
 
+            // 녹음 파일 URI를 얻지 못한 경우 요약 불가
+            if (!audioUri) {
+              Alert.alert('녹음 오류', '녹음 파일을 저장하지 못했어요. 다시 시도해주세요.');
+              setScreenState(ScreenState.IDLE);
+              setCurrentSessionId(null);
+              setElapsedSeconds(0);
+              return;
+            }
+
             await runSummarize(currentSessionId, audioUri, finalSeconds, null);
           },
         },
@@ -373,7 +383,7 @@ export default function MeetingDetailScreen({ route, navigation }) {
         `AI 요약 생성에 실패했어요.\n세션은 저장되었습니다.\n\n오류: ${error.message}`
       );
       updateMeetingSession(meetingId, sessionId, {
-        status: 'completed',
+        status: 'failed',
         duration: durationSeconds > 0 ? formatTimer(durationSeconds) : null,
         summary: null,
         ...(fileName ? { sourceType: 'upload', fileName } : {}),
@@ -806,12 +816,16 @@ const styles = StyleSheet.create({
   },
   badgeOngoing: { backgroundColor: '#F0FDF4' },
   badgeCompleted: { backgroundColor: '#F1F5F9' },
+  badgeFailed: { backgroundColor: '#FEF2F2' },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusDotActive: { backgroundColor: COLORS.success },
   statusDotCompleted: { backgroundColor: COLORS.subtext },
+  statusDotFailed: { backgroundColor: COLORS.error },
+  timelineDotFailed: { backgroundColor: COLORS.error, borderColor: COLORS.error },
   sessionStatusText: { fontSize: 11, fontWeight: '700' },
   ongoingText: { color: COLORS.success },
   completedText: { color: COLORS.subtext },
+  failedText: { color: COLORS.error },
   sessionDate: { fontSize: 11, color: COLORS.subtext },
   sessionInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 8 },
   sessionInfoText: { fontSize: 12, color: COLORS.subtext, flex: 1 },

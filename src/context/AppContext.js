@@ -11,12 +11,13 @@ export const AppProvider = ({ children }) => {
     setUser(userData);
     try {
       const backendMeetings = await fetchMeetings();
-      // 백엔드 응답을 프론트 형식으로 변환
-      const mapped = backendMeetings.map((m) => ({
+      // 백엔드 응답을 프론트 형식으로 변환 (배열이 아닐 경우 방어)
+      const list = Array.isArray(backendMeetings) ? backendMeetings : [];
+      const mapped = list.map((m) => ({
         ...m,
         name: m.title || '(제목 없음)',
-        participants: [],
-        sessions: [],
+        participants: Array.isArray(m.participants) ? m.participants : [],
+        sessions: Array.isArray(m.sessions) ? m.sessions : [],
       }));
       setMeetings(mapped);
     } catch (e) {
@@ -27,6 +28,13 @@ export const AppProvider = ({ children }) => {
   const logout = () => {
     setUser(null);
     setMeetings([]); // 로그아웃 시 회의 목록 초기화
+  };
+
+  /**
+   * 사용자 정보 업데이트 (이름, 역할 등)
+   */
+  const updateUser = (updates) => {
+    setUser((prev) => (prev ? { ...prev, ...updates } : prev));
   };
 
   const addMeeting = async (meetingData) => {
@@ -92,6 +100,7 @@ export const AppProvider = ({ children }) => {
         meetings,
         login,
         logout,
+        updateUser,
         addMeeting,
         addMeetingSession,
         updateMeetingSession,
