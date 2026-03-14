@@ -24,11 +24,20 @@ const COLORS = {
 const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
 
 function formatDate(isoString) {
+  if (!isoString) return '날짜 없음';
   const date = new Date(isoString);
+  if (isNaN(date.getTime())) return '날짜 없음';
   const month = date.getMonth() + 1;
   const day = date.getDate();
   const dayName = DAY_NAMES[date.getDay()];
   return `${month}월 ${day}일 (${dayName})`;
+}
+
+// 참여자 표시용: 백엔드가 객체 or 문자열 어느 쪽으로 줘도 안전하게 이름 추출
+function getParticipantName(p) {
+  if (typeof p === 'string') return p;
+  if (p && typeof p === 'object') return p.name || p.displayName || p.email || String(p);
+  return String(p);
 }
 
 function MeetingCard({ meeting, onPress }) {
@@ -37,14 +46,14 @@ function MeetingCard({ meeting, onPress }) {
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.78}>
       <View style={styles.cardLeft}>
         <View style={styles.cardAvatar}>
-          <Text style={styles.cardAvatarText}>{meeting.name.charAt(0)}</Text>
+          <Text style={styles.cardAvatarText}>{(meeting.name || '?').charAt(0)}</Text>
         </View>
         <View style={styles.cardContent}>
           <Text style={styles.cardTitle} numberOfLines={1}>{meeting.name}</Text>
           <View style={styles.cardMetaRow}>
             <Ionicons name="people-outline" size={12} color={COLORS.subtext} />
             <Text style={styles.cardMeta}>
-              {meeting.participants.join(', ')}
+              {(meeting.participants || []).map(getParticipantName).join(', ')}
             </Text>
           </View>
           <View style={styles.cardMetaRow}>
@@ -79,8 +88,8 @@ export default function MeetingListScreen({ navigation }) {
 
   const filtered = meetings
     .filter((m) =>
-      m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.participants.some((p) => p.includes(searchQuery))
+      (m.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (m.participants || []).some((p) => getParticipantName(p).includes(searchQuery))
     )
     .sort((a, b) => {
       if (sortBy === 'newest') return new Date(b.createdAt) - new Date(a.createdAt);
@@ -144,7 +153,7 @@ export default function MeetingListScreen({ navigation }) {
       ) : (
         <FlatList
           data={filtered}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) => (
             <MeetingCard
               meeting={item}

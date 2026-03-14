@@ -42,6 +42,7 @@ export const AppProvider = ({ children }) => {
     const newMeeting = {
       ...backendMeeting,
       name: backendMeeting.title || meetingData.name,
+      createdAt: backendMeeting.createdAt || new Date().toISOString(), // 백엔드 미반환 시 현재 시간으로 대체
       participants: meetingData.participants || [],
       description: meetingData.description || '',
       sessions: [],

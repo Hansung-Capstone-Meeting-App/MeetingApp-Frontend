@@ -6,7 +6,7 @@
  *   const BASE_URL = 'https://your-backend.com/api';
  */
 // ⚙️ IP가 바뀌면 여기 한 곳만 수정하세요!
-const BASE_HOST = 'http://10.31.230.252:8080';
+const BASE_HOST = 'http://172.30.1.72:8080';
 const BASE_URL = `${BASE_HOST}/api`;
 
 // 로그인 후 토큰 저장 (모듈 내부 상태)
@@ -18,6 +18,26 @@ let storedDisplayName = null;
 export function getStoredDisplayName() { return storedDisplayName; }
 export function setStoredDisplayName(name) { storedDisplayName = name; }
 
+// ─── Timeout Helper ──────────────────────────────────────────────────────────
+
+const TIMEOUT_MS = 10000; // 10초
+
+/**
+ * fetch에 타임아웃 적용
+ * React Native의 fetch는 기본 타임아웃이 없어 백엔드 미응답 시 무한 대기 발생
+ * AbortController로 일정 시간 후 강제 중단
+ */
+function fetchWithTimeout(url, options = {}, timeoutMs = TIMEOUT_MS) {
+  const fetchPromise = fetch(url, options);
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(
+      () => reject(new Error('서버 응답 시간이 초과되었습니다. 네트워크 연결을 확인해주세요.')),
+      timeoutMs
+    )
+  );
+  return Promise.race([fetchPromise, timeoutPromise]);
+}
+
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
 /**
@@ -27,14 +47,14 @@ export function setStoredDisplayName(name) { storedDisplayName = name; }
  * @returns {Promise<{id, name, email, role, token}>}
  */
 export async function loginApi(email, password) {
-  const res = await fetch(`${BASE_HOST}/login`, {
+  const res = await fetchWithTimeout(`${BASE_HOST}/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
   });
   if (!res.ok) throw new Error('로그인 실패');
   const data = await res.json();
-  authToken = data.accessToken; // 이후 요청에 사용할 토큰 저장
+  authToken = data.accessToken;
   return data;
 }
 
@@ -48,7 +68,7 @@ export async function loginApi(email, password) {
  * @returns {Promise<object>}
  */
 export async function registerApi(email, password, displayName) {
-  const res = await fetch(`${BASE_HOST}/user`, {
+  const res = await fetchWithTimeout(`${BASE_HOST}/user`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password, displayName }),
@@ -66,7 +86,7 @@ export async function registerApi(email, password, displayName) {
  * @returns {Promise<Meeting[]>}
  */
 export async function fetchMeetings() {
-  const res = await fetch(`${BASE_URL}/meetings`, { headers: authHeaders() });
+  const res = await fetchWithTimeout(`${BASE_URL}/meetings`, { headers: authHeaders() });
   if (!res.ok) throw new Error('회의 목록 조회 실패');
   return res.json();
 }
@@ -77,7 +97,7 @@ export async function fetchMeetings() {
  * @returns {Promise<Meeting>}
  */
 export async function createMeeting(meetingData) {
-  const res = await fetch(`${BASE_URL}/meetings`, {
+  const res = await fetchWithTimeout(`${BASE_URL}/meetings`, {
     method: 'POST',
     headers: { ...authHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ title: meetingData.name }), // 백엔드 필드명: title
@@ -111,25 +131,25 @@ export async function uploadAndSummarize(meetingId, sessionId, audioUri, duratio
     name: fileName || 'recording.m4a',
   });
 
-  const uploadRes = await fetch(`${BASE_URL}/recordings/upload?meetingId=${meetingId}`, {
+  const uploadRes = await fetchWithTimeout(`${BASE_URL}/recordings/upload?meetingId=${meetingId}`, {
     method: 'POST',
     headers: authHeaders(),
     body: formData,
-  });
+  }, 30000); // 파일 업로드는 30초 타임아웃
   if (!uploadRes.ok) throw new Error('녹음 업로드 실패');
   const uploadData = await uploadRes.json();
   const recordingId = uploadData.recordingId;
 
   // Step 2: AI 분석 요청 (AssemblyAI STT + Claude 요약)
-  const analyzeRes = await fetch(`${BASE_URL}/meetings/${meetingId}/analyze`, {
+  const analyzeRes = await fetchWithTimeout(`${BASE_URL}/meetings/${meetingId}/analyze`, {
     method: 'POST',
     headers: { ...authHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ recordingId, speakerMappings: [] }),
-  });
+  }, 60000); // AI 분석은 60초 타임아웃
   if (!analyzeRes.ok) throw new Error('AI 분석 실패');
 
   // Step 3: 요약 결과 조회
-  const transcriptRes = await fetch(`${BASE_URL}/meetings/${meetingId}/transcript`, {
+  const transcriptRes = await fetchWithTimeout(`${BASE_URL}/meetings/${meetingId}/transcript`, {
     headers: authHeaders(),
   });
   if (!transcriptRes.ok) throw new Error('요약 조회 실패');

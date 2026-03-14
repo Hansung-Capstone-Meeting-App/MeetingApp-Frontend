@@ -33,7 +33,9 @@ function getGreeting() {
 }
 
 function formatDate(isoString) {
+  if (!isoString) return '날짜 없음';
   const date = new Date(isoString);
+  if (isNaN(date.getTime())) return '날짜 없음';
   const month = date.getMonth() + 1;
   const day = date.getDate();
   const dayName = DAY_NAMES[date.getDay()];
@@ -150,7 +152,7 @@ export default function HomeScreen({ navigation }) {
               <View style={styles.recentCardLeft}>
                 <View style={styles.recentAvatarCircle}>
                   <Text style={styles.recentAvatarText}>
-                    {meeting.name.charAt(0)}
+                    {(meeting.name || '?').charAt(0)}
                   </Text>
                 </View>
                 <View>
@@ -158,7 +160,7 @@ export default function HomeScreen({ navigation }) {
                     {meeting.name}
                   </Text>
                   <Text style={styles.recentMeetingMeta}>
-                    {formatDate(meeting.createdAt)} · {meeting.participants.length}명
+                    {formatDate(meeting.createdAt)} · {(meeting.participants || []).length}명
                   </Text>
                 </View>
               </View>

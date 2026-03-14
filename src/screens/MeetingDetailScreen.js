@@ -8,6 +8,7 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -70,6 +71,109 @@ function formatFileSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// ─── 일정 추출 유틸 ────────────────────────────────────────────────────────────
+
+/**
+ * 요약 텍스트에서 날짜·시간이 포함된 일정 문장을 추출합니다.
+ * 화자 레이블(예: [화자1]:, A:) 제거 후 파싱합니다.
+ */
+function extractSchedules(text) {
+  if (!text) return [];
+
+  const dateRe = /(\d{1,2})월\s*\d{1,2}일|다음\s*(주|달)|이번\s*(주|달)|오늘|내일|모레|\d{4}[.\-\/]\d{1,2}[.\-\/]\d{1,2}|(월|화|수|목|금|토|일)요일/;
+  const timeRe = /(오전|오후)\s*\d{1,2}시|\d{1,2}:\d{2}|\d{1,2}시(\s*(반|\d{1,2}분))?/;
+  const eventRe = /회의|미팅|발표|제출|마감|검토|보고|공유|배포|릴리즈|스프린트|데모|일정|예정|진행/;
+
+  const sentences = text
+    .split(/[.!?\n]/)
+    // 화자 레이블 제거: [화자1]: / 화자1: / A: 등
+    .map((s) => s.replace(/^\s*[\[【]?[\w화자\s]*[\]】]?\s*:\s*/u, '').trim())
+    .filter((s) => s.length > 5);
+
+  const found = [];
+  sentences.forEach((s, i) => {
+    const hasDate = dateRe.test(s);
+    const hasTime = timeRe.test(s);
+    const hasEvent = eventRe.test(s);
+    if ((hasDate || hasTime) && (hasEvent || (hasDate && hasTime))) {
+      found.push({ id: String(i), text: s });
+    }
+  });
+  return found;
+}
+
+/** Google Calendar URL로 일정 추가 */
+function openGoogleCalendar(title, details) {
+  const t = encodeURIComponent(title.slice(0, 80));
+  const d = encodeURIComponent(details || title);
+  const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${t}&details=${d}`;
+  Linking.openURL(url).catch(() =>
+    Alert.alert('오류', 'Google 캘린더를 열 수 없어요.\n앱 또는 브라우저를 확인해주세요.')
+  );
+}
+
+// ─── 일정 추출 모달 ────────────────────────────────────────────────────────────
+
+function ScheduleModal({ visible, schedules, onClose }) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.scheduleOverlay}>
+        <View style={styles.scheduleSheet}>
+          <View style={styles.scheduleHandle} />
+
+          {/* 헤더 */}
+          <View style={styles.scheduleHeader}>
+            <View style={styles.scheduleHeaderLeft}>
+              <View style={styles.scheduleHeaderIcon}>
+                <Ionicons name="calendar" size={16} color="#FFFFFF" />
+              </View>
+              <Text style={styles.scheduleTitle}>일정 추출</Text>
+            </View>
+            <TouchableOpacity onPress={onClose} style={styles.scheduleCloseBtn}>
+              <Ionicons name="close" size={20} color={COLORS.subtext} />
+            </TouchableOpacity>
+          </View>
+
+          {schedules.length === 0 ? (
+            /* 일정 없음 */
+            <View style={styles.scheduleEmpty}>
+              <Ionicons name="calendar-outline" size={48} color={COLORS.border} />
+              <Text style={styles.scheduleEmptyTitle}>일정을 찾지 못했어요</Text>
+              <Text style={styles.scheduleEmptyDesc}>
+                요약에 날짜·시간 정보가 포함된{'\n'}문장이 없어요
+              </Text>
+            </View>
+          ) : (
+            <ScrollView style={styles.scheduleList} showsVerticalScrollIndicator={false}>
+              <Text style={styles.scheduleHint}>
+                {schedules.length}건 추출됨 · 항목을 탭하면 Google 캘린더에 추가돼요
+              </Text>
+              {schedules.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={styles.scheduleItem}
+                  onPress={() => openGoogleCalendar(item.text, item.text)}
+                  activeOpacity={0.75}
+                >
+                  <View style={styles.scheduleItemLeft}>
+                    <View style={styles.scheduleItemDot} />
+                    <Text style={styles.scheduleItemText}>{item.text}</Text>
+                  </View>
+                  <View style={styles.scheduleItemAction}>
+                    <Ionicons name="open-outline" size={16} color={COLORS.primary} />
+                    <Text style={styles.scheduleItemActionText}>추가</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+              <View style={{ height: 24 }} />
+            </ScrollView>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 // ─── AI 요약 로딩 모달 ────────────────────────────────────────────────────────
 
 function SummarizingModal({ visible }) {
@@ -109,7 +213,7 @@ function SummarizingModal({ visible }) {
 
 // ─── 세션 카드 ────────────────────────────────────────────────────────────────
 
-function SessionCard({ session, index, total }) {
+function SessionCard({ session, index, total, onExtractSchedule }) {
   const isOngoing = session.status === 'ongoing';
   const isFailed = session.status === 'failed';
   return (
@@ -147,6 +251,14 @@ function SessionCard({ session, index, total }) {
                 <Ionicons name="sparkles" size={10} color="#FFFFFF" />
                 <Text style={styles.aiBadgeText}>AI 요약</Text>
               </View>
+              {/* 일정 추출 버튼 */}
+              <TouchableOpacity
+                style={styles.extractBtn}
+                onPress={() => onExtractSchedule && onExtractSchedule(session.summary)}
+              >
+                <Ionicons name="calendar-outline" size={11} color={COLORS.primary} />
+                <Text style={styles.extractBtnText}>일정 추출</Text>
+              </TouchableOpacity>
             </View>
             <Text style={styles.summaryText}>{session.summary}</Text>
           </View>
@@ -171,6 +283,7 @@ export default function MeetingDetailScreen({ route, navigation }) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null); // { uri, name, size }
+  const [scheduleModal, setScheduleModal] = useState({ visible: false, schedules: [] });
 
   const recordingRef = useRef(null); // expo-av Recording 객체
   const timerRef = useRef(null);
@@ -203,6 +316,13 @@ export default function MeetingDetailScreen({ route, navigation }) {
   const isFileSelected = screenState === ScreenState.FILE_SELECTED;
   const isRecording = screenState === ScreenState.RECORDING;
   const isSummarizing = screenState === ScreenState.SUMMARIZING;
+
+  // ─── 일정 추출 핸들러 ──────────────────────────────────────────────────────
+
+  const handleExtractSchedule = (summaryText) => {
+    const schedules = extractSchedules(summaryText);
+    setScheduleModal({ visible: true, schedules });
+  };
 
   // ─── 마이크 권한 요청 ──────────────────────────────────────────────────────
 
@@ -378,10 +498,12 @@ export default function MeetingDetailScreen({ route, navigation }) {
       setElapsedSeconds(0);
     } catch (error) {
       setScreenState(ScreenState.IDLE);
-      Alert.alert(
-        '요약 실패',
-        `AI 요약 생성에 실패했어요.\n세션은 저장되었습니다.\n\n오류: ${error.message}`
-      );
+      const errMsg = error.message?.includes('시간이 초과')
+        ? '서버 응답 시간이 초과됐어요.\nWi-Fi 연결 및 서버 상태를 확인해주세요.'
+        : error.message?.includes('요약 조회')
+        ? '요약 데이터를 불러오지 못했어요.\n같은 회의를 중복 분석했거나 서버 오류일 수 있어요.\n잠시 후 다시 시도해주세요.'
+        : `AI 요약 생성에 실패했어요.\n세션은 저장되었습니다.\n\n오류: ${error.message}`;
+      Alert.alert('요약 실패', errMsg);
       updateMeetingSession(meetingId, sessionId, {
         status: 'failed',
         duration: durationSeconds > 0 ? formatTimer(durationSeconds) : null,
@@ -398,6 +520,11 @@ export default function MeetingDetailScreen({ route, navigation }) {
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <SummarizingModal visible={isSummarizing} />
+      <ScheduleModal
+        visible={scheduleModal.visible}
+        schedules={scheduleModal.schedules}
+        onClose={() => setScheduleModal({ visible: false, schedules: [] })}
+      />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
@@ -599,6 +726,7 @@ export default function MeetingDetailScreen({ route, navigation }) {
                 session={session}
                 index={index}
                 total={meeting.sessions.length}
+                onExtractSchedule={handleExtractSchedule}
               />
             ))
           )}
@@ -845,4 +973,62 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFBEB', borderRadius: 10, padding: 12,
   },
   summaryPlaceholderText: { fontSize: 13, color: COLORS.warning, fontWeight: '500' },
+
+  // ── 일정 추출 버튼 (세션 카드 내) ──
+  extractBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: '#EEF2FF', borderRadius: 6,
+    paddingHorizontal: 7, paddingVertical: 3,
+  },
+  extractBtnText: { fontSize: 10, fontWeight: '700', color: COLORS.primary },
+
+  // ── 일정 추출 모달 ──
+  scheduleOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end',
+  },
+  scheduleSheet: {
+    backgroundColor: COLORS.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 20, paddingBottom: 34, maxHeight: '75%',
+    shadowColor: '#000', shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12, shadowRadius: 16, elevation: 20,
+  },
+  scheduleHandle: {
+    width: 36, height: 4, borderRadius: 2, backgroundColor: COLORS.border,
+    alignSelf: 'center', marginTop: 12, marginBottom: 16,
+  },
+  scheduleHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16,
+  },
+  scheduleHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  scheduleHeaderIcon: {
+    width: 30, height: 30, borderRadius: 9, backgroundColor: COLORS.primary,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  scheduleTitle: { fontSize: 17, fontWeight: '800', color: COLORS.text },
+  scheduleCloseBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  scheduleEmpty: { alignItems: 'center', paddingVertical: 40 },
+  scheduleEmptyTitle: { fontSize: 15, fontWeight: '700', color: COLORS.subtext, marginTop: 12 },
+  scheduleEmptyDesc: { fontSize: 12, color: '#A0AEC0', textAlign: 'center', marginTop: 6, lineHeight: 18 },
+  scheduleList: { flex: 1 },
+  scheduleHint: {
+    fontSize: 12, color: COLORS.subtext, marginBottom: 12,
+    paddingHorizontal: 2, fontWeight: '500',
+  },
+  scheduleItem: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC', borderRadius: 14, padding: 14, marginBottom: 10,
+    borderWidth: 1, borderColor: COLORS.border,
+  },
+  scheduleItemLeft: { flexDirection: 'row', alignItems: 'flex-start', flex: 1, gap: 10 },
+  scheduleItemDot: {
+    width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.primary,
+    marginTop: 5, flexShrink: 0,
+  },
+  scheduleItemText: { fontSize: 13, color: COLORS.text, lineHeight: 19, flex: 1 },
+  scheduleItemAction: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: '#EEF2FF', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5,
+    marginLeft: 8, flexShrink: 0,
+  },
+  scheduleItemActionText: { fontSize: 11, fontWeight: '700', color: COLORS.primary },
 });

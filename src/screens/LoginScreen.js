@@ -46,12 +46,18 @@ export default function LoginScreen() {
     }
     setIsLoading(true);
     try {
-      await loginApi(email, password);
-      // 이름: 회원가입 시 저장된 이름 → 없으면 이메일 @ 앞부분 사용
-      const name = getStoredDisplayName() || email.split('@')[0];
-      login({ email, name });
+      const data = await loginApi(email, password);
+      // 이름 우선순위: 백엔드 응답 → 회원가입 시 저장된 이름 → 이메일 앞부분
+      const name =
+        data.displayName || data.name || data.username ||
+        getStoredDisplayName() ||
+        email.split('@')[0];
+      await login({ email, name }); // await: fetchMeetings까지 끝난 후 로딩 해제
     } catch (e) {
-      Alert.alert('로그인 실패', '이메일 또는 비밀번호를 확인해주세요.');
+      const msg = e.message?.includes('시간이 초과')
+        ? '서버에 연결할 수 없습니다.\nWi-Fi 연결 및 서버 상태를 확인해주세요.'
+        : '이메일 또는 비밀번호를 확인해주세요.';
+      Alert.alert('로그인 실패', msg);
     } finally {
       setIsLoading(false);
     }
@@ -74,7 +80,10 @@ export default function LoginScreen() {
         { text: '확인', onPress: () => setIsRegisterMode(false) },
       ]);
     } catch (e) {
-      Alert.alert('회원가입 실패', '이미 사용 중인 이메일이거나 입력값을 확인해주세요.');
+      const msg = e.message?.includes('시간이 초과')
+        ? '서버에 연결할 수 없습니다.\nWi-Fi 연결 및 서버 상태를 확인해주세요.'
+        : '이미 사용 중인 이메일이거나 입력값을 확인해주세요.';
+      Alert.alert('회원가입 실패', msg);
     } finally {
       setIsLoading(false);
     }
