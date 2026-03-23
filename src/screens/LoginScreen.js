@@ -52,7 +52,7 @@ export default function LoginScreen() {
         data.displayName || data.name || data.username ||
         getStoredDisplayName() ||
         email.split('@')[0];
-      await login({ email, name }); // await: fetchMeetings까지 끝난 후 로딩 해제
+      await login({ email, name, id: data.userId }); // id: 백엔드 userId 저장
     } catch (e) {
       const msg = e.message?.includes('시간이 초과')
         ? '서버에 연결할 수 없습니다.\nWi-Fi 연결 및 서버 상태를 확인해주세요.'
