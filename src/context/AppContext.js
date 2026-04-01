@@ -1,39 +1,50 @@
 import React, { createContext, useContext, useState } from 'react';
-import { createMeeting, fetchMeetings } from '../services/api';
+import { createMeeting, fetchMeetings, setupDevWorkspace } from '../services/api';
 
 const AppContext = createContext(null);
 
 export const AppProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [meetings, setMeetings] = useState([]); // 예시 데이터 없이 빈 상태로 시작
+  const [meetings, setMeetings] = useState([]);
 
+  /**
+   * 로그인 후 호출
+   * userData: { email, name, id (userId) }
+   */
   const login = async (userData) => {
     setUser(userData);
+    // [dev] 워크스페이스 자동 셋업 (dev 프로파일일 때만 동작, 아니면 조용히 무시)
+    await setupDevWorkspace();
     try {
       const backendMeetings = await fetchMeetings();
-      // 백엔드 응답을 프론트 형식으로 변환
-      const mapped = backendMeetings.map((m) => ({
+      const list = Array.isArray(backendMeetings) ? backendMeetings : [];
+      const mapped = list.map((m) => ({
         ...m,
         name: m.title || '(제목 없음)',
-        participants: [],
+        participants: Array.isArray(m.participants) ? m.participants : [],
         sessions: [],
       }));
       setMeetings(mapped);
     } catch (e) {
-      setMeetings([]); // 불러오기 실패해도 앱은 동작
+      setMeetings([]);
     }
   };
 
   const logout = () => {
     setUser(null);
-    setMeetings([]); // 로그아웃 시 회의 목록 초기화
+    setMeetings([]);
+  };
+
+  const updateUser = (updates) => {
+    setUser((prev) => (prev ? { ...prev, ...updates } : prev));
   };
 
   const addMeeting = async (meetingData) => {
-    const backendMeeting = await createMeeting(meetingData); // 백엔드에 회의 생성 → 실제 ID 획득
+    const backendMeeting = await createMeeting(meetingData);
     const newMeeting = {
       ...backendMeeting,
       name: backendMeeting.title || meetingData.name,
+      createdAt: backendMeeting.createdAt || new Date().toISOString(),
       participants: meetingData.participants || [],
       description: meetingData.description || '',
       sessions: [],
@@ -43,7 +54,7 @@ export const AppProvider = ({ children }) => {
   };
 
   /**
-   * 새 세션을 회의에 추가하고 반환합니다.
+   * 새 세션을 회의에 추가
    */
   const addMeetingSession = (meetingId) => {
     const newSession = {
@@ -52,6 +63,9 @@ export const AppProvider = ({ children }) => {
       duration: null,
       summary: null,
       status: 'ongoing',
+      recordingId: null,
+      keywords: [],
+      segments: [],
     };
     setMeetings((prev) =>
       prev.map((m) =>
@@ -62,10 +76,7 @@ export const AppProvider = ({ children }) => {
   };
 
   /**
-   * 기존 세션을 업데이트합니다. (녹음 완료 후 요약 저장 등)
-   * @param {string} meetingId
-   * @param {string} sessionId
-   * @param {object} updates - 업데이트할 필드 (예: { summary, duration, status })
+   * 기존 세션 업데이트 (녹음 완료 후 요약/recordingId 저장 등)
    */
   const updateMeetingSession = (meetingId, sessionId, updates) => {
     setMeetings((prev) =>
@@ -82,7 +93,6 @@ export const AppProvider = ({ children }) => {
     );
   };
 
-  // 백엔드 ID(숫자)와 로컬 ID(문자열) 모두 대응
   const getMeetingById = (id) => meetings.find((m) => String(m.id) === String(id));
 
   return (
@@ -92,6 +102,7 @@ export const AppProvider = ({ children }) => {
         meetings,
         login,
         logout,
+        updateUser,
         addMeeting,
         addMeetingSession,
         updateMeetingSession,
