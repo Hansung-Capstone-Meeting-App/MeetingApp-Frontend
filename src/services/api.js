@@ -4,7 +4,7 @@
  *
  * ⚙️ IP가 바뀌면 여기 한 곳만 수정하세요!
  */
-const BASE_HOST = 'http://172.30.1.16:8080';
+const BASE_HOST = 'http://223.194.130.66:8080';
 const BASE_URL = `${BASE_HOST}/api`;
 
 // 로그인 후 토큰 저장 (모듈 내부 상태)
